@@ -94,6 +94,8 @@ def download_images(article_url, series_num, cookie):
 	article_title = soup.select(".article-title")[0].getText().strip() # 記事名
 	article_id = article_url.rsplit("/")[-1] # 記事ID
 
+	print(f"★ {article_id=} {article_title} をダウンロードします")
+
 	for idx, elm in enumerate(soup.select(".article-content p img")):
 		url = elm.get("src")
 		try:
@@ -107,11 +109,16 @@ def download_images(article_url, series_num, cookie):
 			print(e)
 
 def main():
+	print("★ starting cake-eater...")
 	root_dir = os.path.dirname(os.path.abspath(__file__))
 	os.chdir(root_dir)
 
 	email, password, serialization_ids = read_settings()
 	cookie = login(email, password)
+	if cookie:
+		print("★ ログイン成功しました。ダウンロード開始します。")
+	else:
+		print("★ ログイン失敗しました。無料記事のみダウンロード開始します。")
 
 	# シリーズの全記事urlの取得
 	for serialization_id in serialization_ids:
@@ -140,6 +147,7 @@ def main():
 		# 個別記事ページからの画像DL
 		# 但し記事を無料範囲でダウンロード後、有料範囲で再度ダウンロードする際スキップされる（有料部分はダウンロードされない）ので
 		# その場合downloaded.txtの該当urlを削除してから再実行してください
+		print(f"★ {author}, {series_title} のダウンロードを開始します")
 		for series_num, article_url in enumerate(download_target_urls):
 			if article_url in downloaded_list:
 				continue
@@ -148,6 +156,7 @@ def main():
 			# ダウンロード後、記事urlをdownloaded.txtに書き込み
 			with open(downloaded_txt, mode="a") as f:
 				f.writelines(f"{article_url}\n")
+		print(f"★ {author}, {series_title} のダウンロードが完了しました")
 
 if __name__ == "__main__":
 	main()
