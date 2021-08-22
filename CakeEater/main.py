@@ -4,17 +4,17 @@ import requests
 from bs4 import BeautifulSoup
 
 def read_settings():
-	"""
-	settings.iniを読み込みます
-	"""
+	"""settings.iniを読み込みます"""
 	try:
 		ini = configparser.ConfigParser()
 		ini.read("settings.ini", encoding="utf-8_sig")
 		email = ini["env"]["email"]
 		password = ini["env"]["password"]
-		serialization_ids = eval(ini["serialization_id"]["idlist"])
-		if type(serialization_ids) == int:
-			serialization_ids = [serialization_ids]
+		serialization_ids = []
+		_serialization_ids = ini["serialization_id"]["idlist"]
+		for i in _serialization_ids.split(","):
+			if i:
+				serialization_ids.append(f"{i.strip()}")
 	except Exception as e:
 		print(f"{e}\nsettings.ini読み込みエラーだよ～ちゃんと用意してね～")
 		exit()
@@ -22,8 +22,7 @@ def read_settings():
 	return email, password, serialization_ids
 
 def login(email, password):
-	"""ログイン成功ならクッキーを返す
-	失敗ならNoneを返す"""
+	"""ログイン成功ならクッキーを返す、失敗ならNoneを返す"""
 
 	loginpage_url = "https://cakes.mu/user/sign_in"
 	login_url = "https://cakes.mu/user/signed_in"
@@ -45,30 +44,6 @@ def login(email, password):
 		return login_result.cookies
 	else:
 		return None	
-
-def get_download_target_urls(serialization_id) -> list:
-	""" 連載固有のID（serialization_id）から、ダウンロード対象のページURLを取得し、リストで返します """
-	download_target_urls = []
-
-	for page_num in range(1, 999):
-		request_url = f"https://cakes.mu/series/posts_pager?page={page_num}&sort=&serialization_id={serialization_id}"
-		response = requests.get(request_url)
-		soup = BeautifulSoup(response.text,'lxml')
-		pages = soup.select(".post-title-full a")
-
-		if pages == []: # ページ遷移先がなくなった時
-			break
-
-		while pages:
-			try:
-				article = pages.pop()
-				relative_url = article.get("href")
-				url = f"https://cakes.mu{relative_url}"
-				download_target_urls.append(url)
-			except Exception as e:
-				print(e)
-
-	return download_target_urls
 
 def get_series_info(article_url):
 	"""個別記事urlから著者名とシリーズ名のみを取得"""
@@ -108,8 +83,53 @@ def download_images(article_url, series_num, cookie):
 		except Exception as e:
 			print(e)
 
+class CakeEater:
+	"""
+	serialization_idを受け取り、記事内の画像をDLします
+
+	Parameters:
+		serialization_id: str
+
+	Instance Variables:
+		self.download_target_urls: list
+	"""
+	def __init__(self, serialization_id):
+		self.serialization_id = serialization_id
+
+	def get_download_target_urls(self):
+		""" 連載固有のID（serialization_id）から、ダウンロード対象のページURLを取得し、リストで返します """
+		_download_target_urls = []
+		page_num = 0
+		while True:
+			page_num += 1
+			request_url = f"https://cakes.mu/series/posts_pager?page={page_num}&sort=&serialization_id={self.serialization_id}"
+			response = requests.get(request_url)
+
+			# 以下では判定ができない
+			# if response.status_code == 404: # ページ遷移先がなくなった時
+			# 	break
+
+			soup = BeautifulSoup(response.text,'lxml')
+			pages = soup.select(".post-title-full a")
+
+			if pages == []: # ステータスコード404では判定ができないことに注意
+				break
+
+			while pages:
+				try:
+					article = pages.pop()
+					relative_url = article.get("href")
+					url = f"https://cakes.mu{relative_url}"
+					_download_target_urls.append(url)
+				except Exception as e:
+					print(e)
+		
+		# ソート
+		_download_target_urls.sort()
+
+		return _download_target_urls
+
 def main():
-	print("★ starting cake-eater...")
 	root_dir = os.path.dirname(os.path.abspath(__file__))
 	os.chdir(root_dir)
 
@@ -122,8 +142,9 @@ def main():
 
 	# シリーズの全記事urlの取得
 	for serialization_id in serialization_ids:
-		download_target_urls = get_download_target_urls(serialization_id)
-		download_target_urls.sort()
+		os.chdir(root_dir)
+		Series = CakeEater(serialization_id)
+		Series.download_target_urls = Series.get_download_target_urls()
 
 		target = download_target_urls[0] # 第1話ページから著者名とシリーズ名を取得
 		author, series_title = get_series_info(target)
@@ -159,4 +180,6 @@ def main():
 		print(f"★ {author}, {series_title} のダウンロードが完了しました")
 
 if __name__ == "__main__":
+	print("★ starting cake-eater...")
 	main()
+	print("★ オワリ")
