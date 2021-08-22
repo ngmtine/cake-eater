@@ -1,4 +1,6 @@
-# cake-eater
-cakesから記事内の画像を一括でDLします
+# CakeEater
+cakesにて画像連載されているシリーズをダウンロードします
 
-いまのところpngしか想定してないです
+ダウンロード済みurlをdownloaded.txtに追記していくのでcronとかに登録しておくと良いかもね
+
+動作はwindows10とubuntu(wsl2)で確認してます
