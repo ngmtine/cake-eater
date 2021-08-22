@@ -45,47 +45,23 @@ def login(email, password):
 	else:
 		return None	
 
-def download_images(article_url, series_num, cookie):
-	"""個別ページのurlから画像をダウンロードします
-	series_numは連載の中の何話目かを示す変数であるが、
-	cakesは連載ごとにそのページが第何話なのか特定できるシリーズ番号を振っていない？のでこちらで管理する必要がある"""
-
-	response = requests.get(article_url, cookies=cookie)
-	soup = BeautifulSoup(response.text,'lxml')
-
-	author = soup.find("meta", attrs={"name": "author"})["content"] # 著者
-	series_title = soup.select("#area_main .box-series .post-items .post-title a")[0].getText().rstrip() # シリーズ名
-	article_title = soup.select(".article-title")[0].getText().strip() # 記事名
-	article_id = article_url.rsplit("/")[-1] # 記事ID
-
-	print(f"★ {article_id=} {article_title} をダウンロードします")
-
-	for idx, elm in enumerate(soup.select(".article-content p img")):
-		url = elm.get("src")
-		try:
-			filename = f"{str(series_num)}_{article_title}({article_id})_{str(idx+1)}.png" # 現在はpng以外の拡張子を想定してない
-			# dest = os.path.join(dirname, filename)
-			response = requests.get(url)
-			image = response.content
-			with open(filename, mode="wb") as file:
-				file.write(image)
-		except Exception as e:
-			print(e)
-
 class CakeEater:
 	"""
 	serialization_idを受け取り、記事内の画像をDLします
 
 	Parameters:
 		serialization_id: str
+		cookie: str
 
 	Instance Variables:
 		self.download_target_urls: list
 	"""
-	def __init__(self, serialization_id):
-		self.serialization_id = serialization_id
+	def __init__(self, serialization_id, cookie):
+		self.serialization_id, self.cookie = serialization_id, cookie
 		self.download_target_urls = self.get_download_target_urls()
 		self.author, self.series_title = self.get_series_info() # 第1話ページから著者名とシリーズ名を取得
+		self.mkdir_chdir()
+		self.downloaded_list = self.get_downloaded_list()
 
 	def get_download_target_urls(self):
 		""" 連載固有のID（serialization_id）から、ダウンロード対象のページURLを取得し、リストで返します """
@@ -125,6 +101,60 @@ class CakeEater:
 
 		return author, series_title
 
+	def mkdir_chdir(self):
+		"""カレントディレクトリにダウンロード先フォルダの作成と移動"""
+		dest_dir = os.path.join(os.getcwd(), self.series_title)
+		os.makedirs(dest_dir, exist_ok=True)
+		os.chdir(dest_dir)
+
+	def get_downloaded_list(self):
+		"""カレントディレクトリのdownloaded.txtの作成と読み込み"""
+		downloaded_txt = os.path.join(os.getcwd(), "downloaded.txt")
+
+		# downloaded.txtの作成
+		if not os.path.isfile(downloaded_txt):
+			with open(downloaded_txt, mode="w") as f:
+				f.write("")
+
+		# downloaded.txtの読み込み
+		with open(downloaded_txt, mode="r") as f:
+			downloaded_list = list(map(lambda i: i.rstrip(), f.readlines()))
+
+		return downloaded_list
+
+	def download_starter(self, article_url, series_num):
+		"""個別ページのurlから画像をダウンロードします
+		series_numは連載の中の何話目かを示す変数であるが、
+		cakesは連載ごとにそのページが第何話なのか特定できるシリーズ番号を振っていない？のでこちらで管理する必要がある"""
+
+		if article_url in self.downloaded_list: # ダウンロード済みの場合
+			return
+
+		else: # 未ダウンロードの場合
+			self.download_images(article_url, series_num)
+			self.append_downloaded_txt(article_url)
+
+	def download_images(self, article_url, series_num):
+		response = requests.get(article_url, cookies=self.cookie)
+		soup = BeautifulSoup(response.text,'lxml')
+		# article_id = article_url.rsplit("/")[-1] # 記事ID
+
+		title = soup.select("title")[0].text
+		for idx, elm in enumerate(soup.select(".article-content p img")):
+			url = elm.get("src")
+			try:
+				filename = f"{str(series_num)}_{self.series_title}_{title}_{str(idx+1)}.png" # 現在はpng以外の拡張子を想定してない
+				response = requests.get(url)
+				image = response.content
+				with open(filename, mode="wb") as file:
+					file.write(image)
+			except Exception as e:
+				print(e)
+
+	def append_downloaded_txt(self, article_url):
+		with open("downloaded.txt", mode="a") as f:
+			f.writelines(f"{article_url}\n")
+
 def main():
 	root_dir = os.path.dirname(os.path.abspath(__file__))
 	os.chdir(root_dir)
@@ -136,44 +166,15 @@ def main():
 	else:
 		print("★ ログイン失敗しました。無料記事のみダウンロード開始します。")
 
-	# シリーズの全記事urlの取得
 	for serialization_id in serialization_ids:
 		os.chdir(root_dir)
-		Series = CakeEater(serialization_id)
-		# Series.download_target_urls = Series.get_download_target_urls()
+		Series = CakeEater(serialization_id, cookie)
 
-		# Series.author, Series.series_title = Series.get_series_info(引数) # 第1話ページから著者名とシリーズ名を取得
-		# author, series_title = get_series_info(target)
+		print(f"★ {Series.author}, {Series.series_title} のダウンロードを開始します")
+		for series_num, article_url in enumerate(Series.download_target_urls):
+			Series.download_starter(article_url, series_num+1)
 
-		# ダウンロード先フォルダ作成と移動
-		dest_dir = os.path.join(root_dir, author, series_title)
-		os.makedirs(dest_dir, exist_ok=True)
-		os.chdir(dest_dir)
-
-		# downloaded.txtが存在しないなら作成する
-		downloaded_txt = os.path.join(dest_dir, "downloaded.txt")
-		if not os.path.isfile(downloaded_txt):
-			with open(downloaded_txt, mode="w") as f:
-				f.write("")
-			
-		# downloaded.txtの読み込み
-		f = open(downloaded_txt, mode="r")
-		downloaded_list = list(map(lambda i: i.rstrip(), f.readlines()))
-		f.close()
-
-		# 個別記事ページからの画像DL
-		# 但し記事を無料範囲でダウンロード後、有料範囲で再度ダウンロードする際スキップされる（有料部分はダウンロードされない）ので
-		# その場合downloaded.txtの該当urlを削除してから再実行してください
-		print(f"★ {author}, {series_title} のダウンロードを開始します")
-		for series_num, article_url in enumerate(download_target_urls):
-			if article_url in downloaded_list:
-				continue
-			download_images(article_url, series_num+1, cookie)
-
-			# ダウンロード後、記事urlをdownloaded.txtに書き込み
-			with open(downloaded_txt, mode="a") as f:
-				f.writelines(f"{article_url}\n")
-		print(f"★ {author}, {series_title} のダウンロードが完了しました")
+		# print(f"★ {author}, {series_title} のダウンロードが完了しました")
 
 if __name__ == "__main__":
 	print("★ starting cake-eater...")
