@@ -45,17 +45,6 @@ def login(email, password):
 	else:
 		return None	
 
-def get_series_info(article_url):
-	"""個別記事urlから著者名とシリーズ名のみを取得"""
-
-	response = requests.get(article_url)
-	soup = BeautifulSoup(response.text,'lxml')
-
-	author = soup.find("meta", attrs={"name": "author"})["content"] # 著者
-	series_title = soup.select("#area_main .box-series .post-items .post-title a")[0].getText().rstrip() # シリーズ名
-
-	return author, series_title
-
 def download_images(article_url, series_num, cookie):
 	"""個別ページのurlから画像をダウンロードします
 	series_numは連載の中の何話目かを示す変数であるが、
@@ -95,6 +84,8 @@ class CakeEater:
 	"""
 	def __init__(self, serialization_id):
 		self.serialization_id = serialization_id
+		self.download_target_urls = self.get_download_target_urls()
+		self.author, self.series_title = self.get_series_info() # 第1話ページから著者名とシリーズ名を取得
 
 	def get_download_target_urls(self):
 		""" 連載固有のID（serialization_id）から、ダウンロード対象のページURLを取得し、リストで返します """
@@ -104,15 +95,10 @@ class CakeEater:
 			page_num += 1
 			request_url = f"https://cakes.mu/series/posts_pager?page={page_num}&sort=&serialization_id={self.serialization_id}"
 			response = requests.get(request_url)
-
-			# 以下では判定ができない
-			# if response.status_code == 404: # ページ遷移先がなくなった時
-			# 	break
-
 			soup = BeautifulSoup(response.text,'lxml')
 			pages = soup.select(".post-title-full a")
 
-			if pages == []: # ステータスコード404では判定ができないことに注意
+			if pages == []: # if response.status_code == 404: では判定ができないことに注意
 				break
 
 			while pages:
@@ -124,10 +110,20 @@ class CakeEater:
 				except Exception as e:
 					print(e)
 		
-		# ソート
-		_download_target_urls.sort()
+		_download_target_urls.sort() # ソート
 
 		return _download_target_urls
+
+	def get_series_info(self):
+		"""第1話ページから著者名とタイトルを取得"""
+		firstpage_url = self.download_target_urls[0]
+		response = requests.get(firstpage_url)
+		soup = BeautifulSoup(response.text,'lxml')
+
+		author = soup.find("meta", attrs={"name": "author"})["content"] # 著者
+		series_title = soup.select("#area_main .box-series .post-items .post-title a")[0].getText().rstrip() # シリーズ名
+
+		return author, series_title
 
 def main():
 	root_dir = os.path.dirname(os.path.abspath(__file__))
@@ -144,10 +140,10 @@ def main():
 	for serialization_id in serialization_ids:
 		os.chdir(root_dir)
 		Series = CakeEater(serialization_id)
-		Series.download_target_urls = Series.get_download_target_urls()
+		# Series.download_target_urls = Series.get_download_target_urls()
 
-		target = download_target_urls[0] # 第1話ページから著者名とシリーズ名を取得
-		author, series_title = get_series_info(target)
+		# Series.author, Series.series_title = Series.get_series_info(引数) # 第1話ページから著者名とシリーズ名を取得
+		# author, series_title = get_series_info(target)
 
 		# ダウンロード先フォルダ作成と移動
 		dest_dir = os.path.join(root_dir, author, series_title)
