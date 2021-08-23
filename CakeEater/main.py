@@ -59,9 +59,17 @@ class CakeEater:
 	def __init__(self, serialization_id=[], cookie="", root_dir=os.getcwd()):
 		self.serialization_id, self.cookie , self.root_dir = serialization_id, cookie, root_dir
 		self.download_target_urls = self.get_download_target_urls()
+		self.series_url = f"https://cakes.mu/series/{self.serialization_id}"
 		self.author, self.series_title = self.get_series_info() # 第1話ページから著者名とシリーズ名を取得
 		self.mkdir_chdir()
 		self.downloaded_list = self.get_downloaded_list()
+
+	def check_exist(self, response):
+		"""指定したシリーズの存在チェック
+		get_writername()でseries_nameを取得するとき一度アクセスするので、その関数内から直接responseオブジェクトを受け取ることにする"""
+		if response.status_code == 404:
+			print(f"★ {self.series_id} は存在しないシリーズです")
+			raise SeriesNotExists("存在しないシリーズです")
 
 	def get_download_target_urls(self):
 		""" 連載固有のID（serialization_id）から、ダウンロード対象のページURLを取得し、リストで返します """
@@ -91,14 +99,12 @@ class CakeEater:
 		return _download_target_urls
 
 	def get_series_info(self):
-		"""第1話ページから著者名とタイトルを取得"""
-		firstpage_url = self.download_target_urls[0]
-		response = requests.get(firstpage_url)
+		"""シリーズページから著者名とタイトルを取得"""
+		response = requests.get(self.series_url)
 		soup = BeautifulSoup(response.text,'lxml')
 
-		author = soup.find("meta", attrs={"name": "author"})["content"] # 著者
-		series_title = soup.select("#area_main .box-series .post-items .post-title a")[0].getText().rstrip() # シリーズ名
-
+		author = soup.find("meta", attrs={"name": "author"}).get("content") # 著者
+		series_title = soup.find("meta", attrs={"property": "og:title"}).get("content") # シリーズ名
 		return author, series_title
 
 	def mkdir_chdir(self):
