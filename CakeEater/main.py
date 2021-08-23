@@ -56,8 +56,8 @@ class CakeEater:
 	Instance Variables:
 		self.download_target_urls: list
 	"""
-	def __init__(self, serialization_id, cookie):
-		self.serialization_id, self.cookie = serialization_id, cookie
+	def __init__(self, serialization_id, cookie, root_dir):
+		self.serialization_id, self.cookie , self.root_dir = serialization_id, cookie, root_dir
 		self.download_target_urls = self.get_download_target_urls()
 		self.author, self.series_title = self.get_series_info() # 第1話ページから著者名とシリーズ名を取得
 		self.mkdir_chdir()
@@ -103,7 +103,7 @@ class CakeEater:
 
 	def mkdir_chdir(self):
 		"""カレントディレクトリにダウンロード先フォルダの作成と移動"""
-		dest_dir = os.path.join(os.getcwd(), self.series_title)
+		dest_dir = os.path.join(self.root_dir, self.series_title)
 		os.makedirs(dest_dir, exist_ok=True)
 		os.chdir(dest_dir)
 
@@ -123,9 +123,15 @@ class CakeEater:
 		return downloaded_list
 
 	def download_starter(self, article_url, series_num):
-		"""個別ページのurlから画像をダウンロードします
-		series_numは連載の中の何話目かを示す変数であるが、
-		cakesは連載ごとにそのページが第何話なのか特定できるシリーズ番号を振っていない？のでこちらで管理する必要がある"""
+		"""
+		個別ページのurlから画像をダウンロード
+		
+		Parameters:
+			article_url: str
+				個別記事url
+			series_num: int
+				その記事が連載の中の第何話なのかを示す数字
+		"""
 
 		if article_url in self.downloaded_list: # ダウンロード済みの場合
 			return
@@ -168,13 +174,12 @@ def main():
 
 	for serialization_id in serialization_ids:
 		os.chdir(root_dir)
-		Series = CakeEater(serialization_id, cookie)
+		Series = CakeEater(serialization_id, cookie, root_dir)
 
-		print(f"★ {Series.author}, {Series.series_title} のダウンロードを開始します")
+		print(f"★ --- {Series.author} / {Series.series_title} のダウンロードを開始します ---")
 		for series_num, article_url in enumerate(Series.download_target_urls):
 			Series.download_starter(article_url, series_num+1)
-
-		# print(f"★ {author}, {series_title} のダウンロードが完了しました")
+		print(f"★ --- {Series.author}, {Series.series_title} のダウンロードが完了しました ---")
 
 if __name__ == "__main__":
 	print("★ starting cake-eater...")
