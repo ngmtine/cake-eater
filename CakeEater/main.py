@@ -52,11 +52,20 @@ class CakeEater:
 	Parameters:
 		serialization_id: str
 		cookie: str
+		root_dir: str
 
 	Instance Variables:
+		self.serialization_id: str
+		self.cookie: str
+		self.root_dir: str
+		self.series_url: str
+		self.author: str
+		self.series_title: str
 		self.download_target_urls: list
+		self.downloaded_list: list
 	"""
-	def __init__(self, serialization_id=[], cookie="", root_dir=os.getcwd()):
+
+	def __init__(self, serialization_id="", cookie="", root_dir=os.getcwd()):
 		self.serialization_id, self.cookie , self.root_dir = serialization_id, cookie, root_dir
 		self.series_url = f"https://cakes.mu/series/{self.serialization_id}"
 
@@ -154,7 +163,6 @@ class CakeEater:
 	def download_images(self, article_url, series_num):
 		response = requests.get(article_url, cookies=self.cookie)
 		soup = BeautifulSoup(response.text,'lxml')
-		# article_id = article_url.rsplit("/")[-1] # 記事ID
 
 		title = soup.select("title")[0].text
 		for idx, elm in enumerate(soup.select(".article-content p img")):
