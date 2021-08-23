@@ -164,11 +164,11 @@ class CakeEater:
 		response = requests.get(article_url, cookies=self.cookie)
 		soup = BeautifulSoup(response.text,'lxml')
 
-		title = soup.select("title")[0].text
+		title = soup.select(".article-title")[0].getText().strip().replace("\n", "")
 		for idx, elm in enumerate(soup.select(".article-content p img")):
 			url = elm.get("src")
 			try:
-				filename = f"{str(series_num)}_{self.series_title}_{title}_{str(idx+1)}.png" # 現在はpng以外の拡張子を想定してない
+				filename = f"{str(series_num)}_{self.author}_{self.series_title}_{title}_{str(idx+1)}.png" # 現在はpng以外の拡張子を想定してない
 				response = requests.get(url)
 				image = response.content
 				with open(filename, mode="wb") as file:
