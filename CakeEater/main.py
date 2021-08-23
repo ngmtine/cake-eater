@@ -58,17 +58,20 @@ class CakeEater:
 	"""
 	def __init__(self, serialization_id=[], cookie="", root_dir=os.getcwd()):
 		self.serialization_id, self.cookie , self.root_dir = serialization_id, cookie, root_dir
-		self.download_target_urls = self.get_download_target_urls()
 		self.series_url = f"https://cakes.mu/series/{self.serialization_id}"
-		self.author, self.series_title = self.get_series_info() # 第1話ページから著者名とシリーズ名を取得
-		self.mkdir_chdir()
-		self.downloaded_list = self.get_downloaded_list()
 
-	def check_exist(self, response):
-		"""指定したシリーズの存在チェック
-		get_writername()でseries_nameを取得するとき一度アクセスするので、その関数内から直接responseオブジェクトを受け取ることにする"""
-		if response.status_code == 404:
-			print(f"★ {self.series_id} は存在しないシリーズです")
+	def check_exist(self, soup):
+		"""
+		指定したシリーズの存在チェック
+		get_series_info()で一度アクセスするので、その関数内から直接soupオブジェクトを受け取ることにする
+		"""
+		check = ""
+		try:
+			check = soup.select(".alert-message p")[1].getText()
+		except:
+			pass		
+		if check: #  "指定された連載は存在しません" 等が入るはず
+			print(f"★ {self.series_url} は存在しないシリーズです")
 			raise SeriesNotExists("存在しないシリーズです")
 
 	def get_download_target_urls(self):
@@ -102,6 +105,8 @@ class CakeEater:
 		"""シリーズページから著者名とタイトルを取得"""
 		response = requests.get(self.series_url)
 		soup = BeautifulSoup(response.text,'lxml')
+
+		self.check_exist(soup) # シリーズ存在チェック
 
 		author = soup.find("meta", attrs={"name": "author"}).get("content") # 著者
 		series_title = soup.find("meta", attrs={"property": "og:title"}).get("content") # シリーズ名
@@ -182,13 +187,21 @@ def main():
 		os.chdir(root_dir)
 		Series = CakeEater(serialization_id, cookie, root_dir)
 
+		try: # シリーズ存在チェック、チェックのためだけにアクセスするのは行儀よくない気がするのでget_series_info()のついでに行う
+			Series.author, Series.series_title = Series.get_series_info()
+		except SeriesNotExists:
+			continue	
+		Series.mkdir_chdir()
+		Series.download_target_urls = Series.get_download_target_urls()
+		Series.downloaded_list = Series.get_downloaded_list()
+
 		print(f"★ --- {Series.author} / {Series.series_title} のダウンロードを開始します ---")
 		for series_num, article_url in enumerate(Series.download_target_urls):
 			Series.download_starter(article_url, series_num+1)
 		print(f"★ --- {Series.author}, {Series.series_title} のダウンロードが完了しました ---")
 
 class SeriesNotExists(Exception):
-	"""series_idが存在しない場合（404にアクセスする場合）を知らせる例外クラス"""
+	"""serialization_idが存在しない場合（トップページに戻される場合）を知らせる例外クラス"""
 	pass
 
 if __name__ == "__main__":
