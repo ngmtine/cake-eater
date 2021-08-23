@@ -56,7 +56,7 @@ class CakeEater:
 	Instance Variables:
 		self.download_target_urls: list
 	"""
-	def __init__(self, serialization_id, cookie, root_dir):
+	def __init__(self, serialization_id=[], cookie="", root_dir=os.getcwd()):
 		self.serialization_id, self.cookie , self.root_dir = serialization_id, cookie, root_dir
 		self.download_target_urls = self.get_download_target_urls()
 		self.author, self.series_title = self.get_series_info() # 第1話ページから著者名とシリーズ名を取得
@@ -180,6 +180,10 @@ def main():
 		for series_num, article_url in enumerate(Series.download_target_urls):
 			Series.download_starter(article_url, series_num+1)
 		print(f"★ --- {Series.author}, {Series.series_title} のダウンロードが完了しました ---")
+
+class SeriesNotExists(Exception):
+	"""series_idが存在しない場合（404にアクセスする場合）を知らせる例外クラス"""
+	pass
 
 if __name__ == "__main__":
 	print("★ starting cake-eater...")
